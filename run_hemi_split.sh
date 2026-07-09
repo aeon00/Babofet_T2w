@@ -25,6 +25,8 @@ module purge
 module load all
 module load FSL
 module load ANTS
+source ~/.bashrc
+conda activate babofet
 
 # Hemisphere Splitting and Registration
 echo "Running 02_hemi_split.py for ${SUBJECT} ${SESSION}"
