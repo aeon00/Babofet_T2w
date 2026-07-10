@@ -34,7 +34,7 @@ conda activate babofet
 # Call the conda env's python explicitly so antspyx/numpy/pandas are guaranteed.
 # ${CONDA_PREFIX}/bin/python is set by 'conda activate babofet' above.
 echo "CONDA_PREFIX = ${CONDA_PREFIX}"
-"${CONDA_PREFIX}/bin/python" -c "import ants; print('antspyx OK)"
+"${CONDA_PREFIX}/bin/python" -c "import ants; print('antspyx OK, version')"
 
 # Hemisphere Splitting and Registration
 echo "Running 02_hemi_split.py for ${SUBJECT} ${SESSION}"
