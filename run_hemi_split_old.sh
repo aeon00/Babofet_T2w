@@ -25,19 +25,11 @@ module purge
 module load all
 module load FSL
 module load ANTS
-
-# Activate conda the same way as your working scripts on this cluster
 source ~/.bashrc
 conda activate babofet
 
-# FSL and ANTS modules put their own python on PATH, which shadows the conda one.
-# Call the conda env's python explicitly so antspyx/numpy/pandas are guaranteed.
-# ${CONDA_PREFIX}/bin/python is set by 'conda activate babofet' above.
-echo "CONDA_PREFIX = ${CONDA_PREFIX}"
-"${CONDA_PREFIX}/bin/python" -c "import ants; print('antspyx OK)"
-
 # Hemisphere Splitting and Registration
 echo "Running 02_hemi_split.py for ${SUBJECT} ${SESSION}"
-"${CONDA_PREFIX}/bin/python" extraction_module/02_hemi_split.py --subject "${SUBJECT}" --session "${SESSION}"
+python extraction_module/02_hemi_split.py --subject "${SUBJECT}" --session "${SESSION}"
 echo "------------------------------------------------------------------------------"
 echo "Hemisphere splitting finished."
