@@ -29,6 +29,8 @@ def get_gestational_info(female_name, session_id, tsv_file):
     return gestational_age, adequate_atlas
 
 
+
+
 def fsl_register_single(atlas_file, base_subj_path, subject, session, output_dir):
     # SUBJECT_SESSION_rec-niftymic_desc-brainbg_T2w.nii.gz
     reference = os.path.join(base_subj_path, f"{subject}_{session}_rec-niftymic_desc-brainbg_T2w.nii.gz")
@@ -36,7 +38,7 @@ def fsl_register_single(atlas_file, base_subj_path, subject, session, output_dir
     # SUBJECT_SESSION_rec-niftymic_desc-brain_mask.nii.gz
     reference_mask = os.path.join(base_subj_path, f"{subject}_{session}_rec-niftymic_desc-brain_mask.nii.gz")
 
-    # Brain-masked T2w is a temporary product: written into the scratch dir
+    # Brain-masked T2w is a temporary product now: written into the scratch dir
     # (output_dir) instead of the niftymic folder, so no input folder is touched.
     new_reference = os.path.join(output_dir, f"{subject}_{session}_rec-niftymic_desc-brain_T2w.nii.gz")
 
@@ -77,6 +79,15 @@ def fsl_register_single(atlas_file, base_subj_path, subject, session, output_dir
 
 
 def convert_fsl2ants(input_atlas_registered, best_atlas, subject, session, base_subj_path):
+    """
+    tools/c3d_affine_tool \
+        -ref ${REFERENCE} \
+        -src ${MOVING} \
+        "$OUTPUT_DIR/affine.mat" \
+        -fsl2ras \
+        -oitk "$OUTPUT_DIR/affine.txt"
+    """
+
     best_atlas_name = os.path.basename(best_atlas)
     affine_file = os.path.join(input_atlas_registered, best_atlas_name.replace(".nii.gz", "_affine.mat"))
     oitk = os.path.join(input_atlas_registered, best_atlas_name.replace(".nii.gz", "_affine.txt"))
@@ -128,8 +139,6 @@ def ants_nonlinear_registration(input_atlas_registered, base_subj_path, best_atl
             "--convergence", "[200x200x200x100x100x100, 1e-6, 10]",
             "--shrink-factors", "4x4x2x2x1x1",
             "--smoothing-sigmas", "6x5x4x2x1x0",
-            # NOTE: no space after the comma - a leading space makes some ITK
-            # builds look for " /path/mask.nii.gz" and fail with "does not exist".
             "--masks", f"[{ref_mask},{best_atlas_mask}]",
         ],
             check=True,
@@ -162,10 +171,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Split brain segmentation into hemispheres and register to atlas.")
     parser.add_argument("--subject", type=str, help="Subject ID to process (e.g., sub-Borgne)")
     parser.add_argument("--session", required=True, help="Session ID (e.g., ses-01)")
-    parser.add_argument("--output", type=str, default=None,
-                        help="Output ROOT for the hemi file. The script appends "
-                             "<subject>/<session>/ and writes <subject>_<session>_hemi.nii.gz there. "
-                             "If omitted, the file is saved next to the input segmentation (BIDS longiseg).")
     args = parser.parse_args()
 
     input_volume_path = os.path.join(cfg.DERIVATIVES_BIDS_PATH, "niftymic")
@@ -186,10 +191,13 @@ if __name__ == "__main__":
     print(f"Processing {subject} {session}")
     subject_path = os.path.join(input_seg_path, subject)
 
-    # Folder holding the INPUT segmentation (BIDS longiseg). Reads happen here.
+    # Folder holding the input segmentation. The split hemispheres are the ONLY
+    # file written back here; it is the sole permanent output of this script.
     session_path = os.path.join(subject_path, session, "anat")
 
+
     # SUBJECT_SESSION_desc-longiseg_dseg.nii.gz
+
     t2_subj_seg = os.path.join(session_path, f"{subject}_{session}_desc-longiseg_dseg.nii.gz")
     try:
         fixed_seg = ants.image_read(t2_subj_seg)
@@ -200,23 +208,16 @@ if __name__ == "__main__":
     # SUBJECT_SESSION_rec-niftymic_desc-brain_T2w.nii.gz
     recons_volumes_folder = os.path.join(input_volume_path, subject, session, "anat")
 
-    # ---- Where the final hemi file goes ----
-    # With --output: <output_root>/<subject>/<session>/<subject>_<session>_hemi.nii.gz
-    # Without:       next to the input segmentation (BIDS longiseg anat folder).
-    if args.output:
-        out_dir = os.path.join(args.output, subject, session)
-        os.makedirs(out_dir, exist_ok=True)
-    else:
-        out_dir = session_path
-    file_seg_out = os.path.join(out_dir, f"{subject}_{session}_hemi.nii.gz")
-
+    # Final output: written to the same folder as the input segmentation (session_path).
+    file_seg_out = os.path.join(session_path, f"{subject}_{session}_hemi.nii.gz")
     if os.path.exists(file_seg_out):
         print(f"\t\tSegmentation for {subject} {session} already exists, skipping...")
         exit(0)
 
-    # All registration intermediates go into a temp dir that is deleted on exit,
-    # so only file_seg_out survives. dir=intermediate_path keeps scratch on the
-    # data filesystem rather than a small /tmp.
+    # All registration intermediates (FLIRT affines, ANTs warps, warped_regionals,
+    # brain-masked T2w) go into a temporary directory that is deleted automatically
+    # when the block exits, whether it succeeds or errors. Only file_seg_out survives.
+    # dir=intermediate_path keeps scratch on the data filesystem (not a small /tmp).
     with tempfile.TemporaryDirectory(prefix=f"{subject}_{session}_hemi_", dir=intermediate_path) as scratch_dir:
 
         tsv_file = os.path.join(cfg.SOURCEDATA_BIDS_PATH, "raw", subject, f"{subject}_sessions.tsv")
@@ -234,6 +235,7 @@ if __name__ == "__main__":
             output_dir=scratch_dir
         )
 
+        # best_atlas is the registered output filename, used by downstream .replace() calls
         best_atlas = atlas_filename.replace(".nii.gz", "_affine.nii.gz")
         print(f"\t\tSelected atlas: {best_atlas}")
 
@@ -270,6 +272,7 @@ if __name__ == "__main__":
         )
 
         warped_best_seg = ants.image_read(os.path.join(scratch_dir, "warped_regionals.nii.gz"))
+
 
         unique_label_t2 = np.unique(fixed_seg.numpy())
         if 4 in unique_label_t2:
