@@ -139,7 +139,7 @@ def ants_nonlinear_registration(input_atlas_registered, base_subj_path, best_atl
             "--convergence", "[200x200x200x100x100x100, 1e-6, 10]",
             "--shrink-factors", "4x4x2x2x1x1",
             "--smoothing-sigmas", "6x5x4x2x1x0",
-            "--masks", f"[{ref_mask}, {best_atlas_mask}]",
+            "--masks", f"[{ref_mask},{best_atlas_mask}]",
         ],
             check=True,
         )
