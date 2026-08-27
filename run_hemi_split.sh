@@ -9,18 +9,20 @@
 set -e
 
 # Check for arguments
-if [ "$#" -ne 3 ]; then
+if [ "$#" -ne 4 ]; then
     echo "Error: Missing arguments."
-    echo "Usage: sbatch $0 <subject_id> <session_id> <output_root>"
-    echo "Example: sbatch $0 sub-Borgne ses-01 /envau/work/meca/users/dienye.h/python_files/Babofet/sub-Borgne/sub-Borgne-seg"
+    echo "Usage: sbatch $0 <subject_id> <session_id> <input_root> <output_root>"
+    echo "Example: sbatch $0 sub-Fabienne ses-01 /envau/work/meca/users/dienye.h/python_files/Babofet/sub-Fabienne/sub-Fabienne /envau/work/meca/users/dienye.h/python_files/Babofet/sub-Fabienne"
     exit 1
 fi
 
 SUBJECT=$1
 SESSION=$2
-OUTPUT_ROOT=$3
+INPUT_ROOT=$3
+OUTPUT_ROOT=$4
 
 echo "Starting Hemisphere Splitting for subject: ${SUBJECT} session: ${SESSION}"
+echo "Input root:  ${INPUT_ROOT}"
 echo "Output root: ${OUTPUT_ROOT}"
 
 module purge
@@ -41,7 +43,7 @@ echo "Running 02_hemi_split.py for ${SUBJECT} ${SESSION}"
 "${CONDA_PREFIX}/bin/python" extraction_module/02_hemi_split.py \
     --subject "${SUBJECT}" \
     --session "${SESSION}" \
-    --input "${SUBJ_DIR}" \
+    --input "${INPUT_ROOT}" \
     --output "${OUTPUT_ROOT}"
 echo "------------------------------------------------------------------------------"
 echo "Hemisphere splitting finished."
