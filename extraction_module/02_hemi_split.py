@@ -162,6 +162,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Split brain segmentation into hemispheres and register to atlas.")
     parser.add_argument("--subject", type=str, help="Subject ID to process (e.g., sub-Borgne)")
     parser.add_argument("--session", required=True, help="Session ID (e.g., ses-01)")
+    parser.add_argument("--input", type=str, default=None,
+                        help="Input ROOT that directly contains the <session>/anat/ folders holding your "
+                             "segmentations (e.g. .../Babofet/sub-Aziza/sub-Aziza). The script reads "
+                             "<input>/<session>/anat/<subject>_<session>_desc-longiseg_dseg*.nii.gz. "
+                             "If omitted, reads from the BIDS longiseg tree.")
     parser.add_argument("--output", type=str, default=None,
                         help="Output ROOT for the hemi file. The script appends "
                              "<subject>/<session>/ and writes <subject>_<session>_hemi.nii.gz there. "
@@ -184,25 +189,42 @@ if __name__ == "__main__":
     session = args.session
 
     print(f"Processing {subject} {session}")
-    subject_path = os.path.join(input_seg_path, subject)
 
-    # Folder holding the INPUT segmentation (BIDS longiseg). Reads happen here.
-    session_path = os.path.join(subject_path, session, "anat")
+    # ---- Where the INPUT segmentation is read from ----
+    # With --input: <input>/<session>/anat/    (your own tree)
+    # Without:      BIDS longiseg  <root>/longiseg/<subject>/<session>/anat/
+    if args.input:
+        session_path = os.path.join(args.input, session, "anat")
+    else:
+        session_path = os.path.join(input_seg_path, subject, session, "anat")
 
-    # SUBJECT_SESSION_desc-longiseg_dseg.nii.gz
-    t2_subj_seg = os.path.join(session_path, f"{subject}_{session}_desc-longiseg_dseg.nii.gz")
-    try:
-        fixed_seg = ants.image_read(t2_subj_seg)
-    except ValueError:
-        t2_subj_seg = os.path.join(session_path, f"{subject}_{session}_desc-longiseg_dseg_gt.nii.gz")
-        fixed_seg = ants.image_read(t2_subj_seg)
+    # Pick the first segmentation file that exists, in priority order.
+    # Your manual segmentations (_dseg_manual) are preferred; BIDS names are fallbacks.
+    seg_candidates = [
+        f"{subject}_{session}_desc-longiseg_dseg_manual.nii.gz",
+        f"{subject}_{session}_desc-longiseg_dseg.nii.gz",
+        f"{subject}_{session}_desc-longiseg_dseg_gt.nii.gz",
+    ]
+    t2_subj_seg = None
+    for cand in seg_candidates:
+        candidate_path = os.path.join(session_path, cand)
+        if os.path.exists(candidate_path):
+            t2_subj_seg = candidate_path
+            break
+    if t2_subj_seg is None:
+        print(f"Error: no segmentation found in {session_path}")
+        print(f"       tried: {', '.join(seg_candidates)}")
+        exit(1)
 
-    # SUBJECT_SESSION_rec-niftymic_desc-brain_T2w.nii.gz
+    print(f"\t\tUsing segmentation: {t2_subj_seg}")
+    fixed_seg = ants.image_read(t2_subj_seg)
+
+    # SUBJECT_SESSION_rec-niftymic_desc-brain_T2w.nii.gz  (still from BIDS niftymic)
     recons_volumes_folder = os.path.join(input_volume_path, subject, session, "anat")
 
     # ---- Where the final hemi file goes ----
     # With --output: <output_root>/<subject>/<session>/<subject>_<session>_hemi.nii.gz
-    # Without:       next to the input segmentation (BIDS longiseg anat folder).
+    # Without:       next to the input segmentation.
     if args.output:
         out_dir = os.path.join(args.output, subject, session)
         os.makedirs(out_dir, exist_ok=True)
