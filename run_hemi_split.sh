@@ -41,6 +41,7 @@ echo "Running 02_hemi_split.py for ${SUBJECT} ${SESSION}"
 "${CONDA_PREFIX}/bin/python" extraction_module/02_hemi_split.py \
     --subject "${SUBJECT}" \
     --session "${SESSION}" \
+    --input "${SUBJ_DIR}" \
     --output "${OUTPUT_ROOT}"
 echo "------------------------------------------------------------------------------"
 echo "Hemisphere splitting finished."
