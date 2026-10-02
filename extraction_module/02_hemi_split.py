@@ -162,6 +162,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Split brain segmentation into hemispheres and register to atlas.")
     parser.add_argument("--subject", type=str, help="Subject ID to process (e.g., sub-Borgne)")
     parser.add_argument("--session", required=True, help="Session ID (e.g., ses-01)")
+    parser.add_argument("--scratch", type=str, default=None,
+                        help="Writable base dir for temporary registration files. "
+                             "Defaults to the system temp dir if omitted.")    
     parser.add_argument("--input", type=str, default=None,
                         help="Input ROOT that directly contains the <session>/anat/ folders holding your "
                              "segmentations (e.g. .../Babofet/sub-Aziza/sub-Aziza). The script reads "
@@ -239,7 +242,11 @@ if __name__ == "__main__":
     # All registration intermediates go into a temp dir that is deleted on exit,
     # so only file_seg_out survives. dir=intermediate_path keeps scratch on the
     # data filesystem rather than a small /tmp.
-    with tempfile.TemporaryDirectory(prefix=f"{subject}_{session}_hemi_", dir=intermediate_path) as scratch_dir:
+    scratch_base = args.scratch if args.scratch else None  # None -> system default ($TMPDIR or /tmp)
+    if scratch_base:
+        os.makedirs(scratch_base, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix=f"{subject}_{session}_hemi_", dir=scratch_base) as scratch_dir:
 
         tsv_file = os.path.join(cfg.SOURCEDATA_BIDS_PATH, "raw", subject, f"{subject}_sessions.tsv")
         subject_ga, atlas_ga = get_gestational_info(subject, session, tsv_file)
