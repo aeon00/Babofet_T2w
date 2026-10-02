@@ -8,7 +8,7 @@ import os
 
 
 # BIDS Path
-BASE_BIDS_PATH = "/envau/work/meca/users/dienye.h/BaboFet_BIDS"
+BASE_BIDS_PATH = "/envau/work/meca/data/BaboFet_BIDS"
 SOURCEDATA_BIDS_PATH = os.path.join(BASE_BIDS_PATH, "sourcedata")
 DERIVATIVES_BIDS_PATH = os.path.join(BASE_BIDS_PATH, "derivatives")
 
